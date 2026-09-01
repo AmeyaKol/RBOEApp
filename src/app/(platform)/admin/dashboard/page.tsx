@@ -8,10 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { 
-  Users, 
-  MessageSquare, 
+  Users,
+  MessageSquare,
   Clock,
-  CheckCircle,
   AlertCircle,
   Eye,
   FileText,
@@ -46,9 +45,17 @@ interface DashboardData {
   upcomingDeadlines: Array<{
     deadline: string;
     university_name: string;
+    program_name?: string;
+    status?: string;
     profiles?: {
       full_name: string;
     };
+  }>;
+  recentActivity: Array<{
+    kind: "request" | "document" | "application";
+    text: string;
+    detail: string;
+    at: string;
   }>;
 }
 
@@ -232,11 +239,11 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Application Status Overview - Assigned Students Only */}
+          {/* Application Status Overview */}
           <Card>
             <CardHeader>
               <CardTitle>Application Status Overview</CardTitle>
-              <CardDescription>Status of applications for students assigned to you</CardDescription>
+              <CardDescription>Across all students in your workspace</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -257,10 +264,14 @@ export default function AdminDashboardPage() {
                   <div className="text-sm text-muted-foreground">Rejected</div>
                 </div>
               </div>
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  ✓ Showing data only for students assigned to you ({dashboardData?.stats.totalStudents || 0} students)
-                </p>
+              <div className="mt-4 flex items-center justify-between rounded-lg bg-muted p-3 text-sm">
+                <span className="text-muted-foreground">
+                  {dashboardData?.stats.totalStudents || 0} students •{" "}
+                  {dashboardData?.stats.totalApplications || 0} applications
+                </span>
+                <span className="font-medium text-foreground">
+                  Success rate: {dashboardData?.stats.successRate || "—"}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -306,73 +317,56 @@ export default function AdminDashboardPage() {
                   </Button>
                 </Link>
               </div>
-              <CardDescription>University application deadlines this month</CardDescription>
+              <CardDescription>Next application deadlines across your students</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Mini Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1 mb-4 text-center text-xs font-medium text-muted-foreground">
-                <div>Sun</div>
-                <div>Mon</div>
-                <div>Tue</div>
-                <div>Wed</div>
-                <div>Thu</div>
-                <div>Fri</div>
-                <div>Sat</div>
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1 mb-4">
-                {/* Sample calendar dates with deadline indicators */}
-                {Array.from({ length: 35 }, (_, i) => {
-                  const date = i + 1;
-                  const hasDeadline = [15, 20, 28].includes(date);
-                  const isUrgent = [15].includes(date);
-                  
-                  return (
-                    <div 
-                      key={i} 
-                      className={`
-                        h-8 w-8 flex items-center justify-center text-xs rounded cursor-pointer
-                        ${date <= 31 ? 'hover:bg-gray-100' : 'text-gray-300'}
-                        ${hasDeadline ? (isUrgent ? 'bg-red-100 text-red-800 font-bold' : 'bg-yellow-100 text-yellow-800 font-medium') : ''}
-                      `}
-                    >
-                      {date <= 31 ? date : ''}
-                      {hasDeadline && <div className={`absolute w-2 h-2 rounded-full ${isUrgent ? 'bg-red-500' : 'bg-yellow-500'} -mt-6 ml-4`}></div>}
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Deadline Details */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-200">
-                  <div>
-                    <p className="text-sm font-medium text-red-800">Dec 15 - Stanford University</p>
-                    <p className="text-xs text-red-600">MS Computer Science (Priority)</p>
+              {dashboardData?.upcomingDeadlines.length ? (
+                <div className="space-y-2">
+                  {dashboardData.upcomingDeadlines.map((d, i) => {
+                    const days = Math.ceil(
+                      (new Date(d.deadline).getTime() - Date.now()) / (1000 * 3600 * 24)
+                    );
+                    const urgent = days <= 3;
+                    const soon = days <= 14;
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center justify-between rounded border p-2 ${
+                          urgent
+                            ? "border-red-200 bg-red-50"
+                            : soon
+                            ? "border-yellow-200 bg-yellow-50"
+                            : "border-border"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {new Date(d.deadline).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}{" "}
+                            — {d.university_name}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {d.profiles?.full_name || "Student"}
+                            {d.program_name ? ` • ${d.program_name}` : ""}
+                          </p>
+                        </div>
+                        <Badge variant={urgent ? "destructive" : "outline"}>
+                          {days <= 0 ? "Due" : days === 1 ? "Tomorrow" : `${days} days`}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    🔴 Urgent (≤3 days) • 🟡 Upcoming (≤14 days)
                   </div>
-                  <Badge variant="destructive">Today</Badge>
                 </div>
-                
-                <div className="flex items-center justify-between p-2 bg-yellow-50 rounded border border-yellow-200">
-                  <div>
-                    <p className="text-sm font-medium text-yellow-800">Dec 20 - MIT</p>
-                    <p className="text-xs text-yellow-600">MS Data Science</p>
-                  </div>
-                  <Badge variant="outline">5 days</Badge>
-                </div>
-                
-                <div className="flex items-center justify-between p-2 bg-yellow-50 rounded border border-yellow-200">
-                  <div>
-                    <p className="text-sm font-medium text-yellow-800">Dec 28 - Georgia Tech</p>
-                    <p className="text-xs text-yellow-600">MS Computer Science</p>
-                  </div>
-                  <Badge variant="outline">13 days</Badge>
-                </div>
-              </div>
-              
-              <div className="mt-4 text-xs text-muted-foreground">
-                🔴 Urgent (≤3 days) • 🟡 Upcoming (≤14 days)
-              </div>
+              ) : (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No upcoming deadlines
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -380,51 +374,37 @@ export default function AdminDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Recent Student Activity</CardTitle>
-              <CardDescription>Track activities of students assigned to you</CardDescription>
+              <CardDescription>Latest requests, document edits, and application changes</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Priya Sharma submitted SOP</p>
-                    <p className="text-xs text-muted-foreground">Stanford CS application • 2 hours ago</p>
-                  </div>
+              {dashboardData?.recentActivity.length ? (
+                <div className="space-y-3">
+                  {dashboardData.recentActivity.map((a, i) => {
+                    const Icon =
+                      a.kind === "request"
+                        ? MessageSquare
+                        : a.kind === "document"
+                        ? FileText
+                        : GraduationCap;
+                    return (
+                      <div key={i} className="flex items-start space-x-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{a.text}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.detail} • {new Date(a.at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Arjun Patel updated profile</p>
-                    <p className="text-xs text-muted-foreground">Added TOEFL scores • 1 day ago</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-4 h-4 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Zara Khan sent new request</p>
-                    <p className="text-xs text-muted-foreground">College selection advice • 2 days ago</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted">
-                    <GraduationCap className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Priya Sharma started MIT application</p>
-                    <p className="text-xs text-muted-foreground">MS Data Science program • 3 days ago</p>
-                  </div>
-                </div>
-              </div>
-              
+              ) : (
+                <p className="py-4 text-center text-sm text-muted-foreground">No recent activity</p>
+              )}
+
               <div className="mt-4 pt-3 border-t">
                 <Link href="/admin/activity-log">
                   <Button variant="outline" size="sm" className="w-full">
