@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminResponseModal } from "@/components/features/AdminResponseModal";
 import { CommentThread } from "@/components/features/CommentThread";
+import { DocumentEditor } from "@/components/features/DocumentEditor";
 import { useAuth } from "@/hooks/useAuth";
 import {
   MessageSquare,
@@ -562,26 +563,24 @@ export default function AdminRequestsPage() {
               </div>
             </CardHeader>
             <CardContent className="overflow-y-auto flex-1 space-y-4">
-              {linkedViewRequest.link.kind === "document" &&
-                (linkedViewRequest.documentContent ? (
-                  <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
-                    {linkedViewRequest.documentContent}
-                  </pre>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No content available.</p>
-                ))}
-              <div className="border-t pt-4">
-                <CommentThread
-                  documentId={
-                    linkedViewRequest.link.kind === "document" ? linkedViewRequest.link.id : undefined
-                  }
-                  applicationId={
-                    linkedViewRequest.link.kind === "application"
-                      ? linkedViewRequest.link.id
-                      : undefined
-                  }
+              {linkedViewRequest.link.kind === "document" && linkedViewRequest.link.id ? (
+                <DocumentEditor
+                  documentId={linkedViewRequest.link.id}
+                  title={linkedViewRequest.documentTitle || "Document"}
+                  type={linkedViewRequest.documentType || "SOP"}
+                  initialContent={linkedViewRequest.documentContent || ""}
+                  initialVersion={linkedViewRequest.documentVersion ?? 1}
+                  linkedRequestId={linkedViewRequest.id}
+                  onSaved={({ resolvedRequest }) => {
+                    fetchRequests();
+                    if (resolvedRequest) setLinkedViewRequest(null);
+                  }}
                 />
-              </div>
+              ) : (
+                <div className="border-t pt-4">
+                  <CommentThread applicationId={linkedViewRequest.link.id} />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

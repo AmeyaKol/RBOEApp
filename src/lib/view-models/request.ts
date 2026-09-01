@@ -72,6 +72,7 @@ export interface AdminRequestViewModel extends StudentRequestViewModel {
   documentTitle?: string;
   documentType?: string;
   documentContent?: string;
+  documentVersion?: number;
   /** linked application (if any) */
   applicationId?: string;
   universityName?: string;
@@ -85,6 +86,7 @@ interface ApiDocumentLink {
   title: string;
   type: string;
   content?: string;
+  version?: number;
 }
 
 interface ApiApplicationLink {
@@ -169,6 +171,7 @@ export function mapApiAdminRequestToViewModel(r: ApiAdminRequestRow): AdminReque
     documentTitle: r.documents?.title,
     documentType: r.documents?.type,
     documentContent: r.documents?.content,
+    documentVersion: r.documents?.version,
     applicationId: r.applications?.id,
     universityName: r.applications?.university_name,
     programName: r.applications?.program_name ?? undefined,

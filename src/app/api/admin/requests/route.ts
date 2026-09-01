@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
           id,
           title,
           type,
-          content
+          content,
+          version
         ),
         applications (
           id,
