@@ -131,6 +131,27 @@ Every one of these shows a **Preview** banner and persists nothing.
 
 ## Admin navigation
 
-The bar under the header links every admin area. The four Preview areas carry a
-"Preview" tag. Students reach their pages from the dashboard quick-action cards
-and the onboarding / applications pages.
+The **admin dashboard is the home for every area**: a grouped card grid
+(*Workspace* and *Business & AI — Preview*) routes to each page, with live
+student / pending-request counts on the relevant cards.
+
+Away from the dashboard, the slim bar under the header carries the current
+section name, a **Dashboard** shortcut, and a **Switch workspace** dropdown —
+click it for the full grouped list (each entry has a one-line description; the
+four Preview areas carry a "Preview" tag). The menu closes on selection,
+outside click, or Escape.
+
+Students reach their pages from the dashboard quick-action cards and the
+onboarding / applications pages.
+
+### Calendar  (`/admin/calendar`)
+
+Application deadlines and visa mock interview slots for every assigned student,
+as a date-grouped list. Filter by **Deadlines / Visa**, toggle **Show past**,
+and click any row to open that student. Backed by `GET /api/admin/calendar`.
+
+### Activity log  (`/admin/activity-log`)
+
+The full reverse-chronological feed the dashboard widget samples — recent
+request, document, and application changes, grouped by day, filterable by kind,
+each row linking to the student. Backed by `GET /api/admin/activity-log`.
