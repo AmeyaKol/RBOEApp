@@ -196,12 +196,6 @@ export function Header() {
           )}
         </div>
       </header>
-
-      {user && isAdmin && (
-        <div className="border-b border-border bg-muted/80 px-4 py-1.5 text-center text-xs text-muted-foreground">
-          Admin workspace — tools and data below apply to your assigned students.
-        </div>
-      )}
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, PageShell } from "@/components/shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,9 +59,10 @@ const byUrgencyThenDate = (a: AdminRequestViewModel, b: AdminRequestViewModel) =
  * SRS Requirements: 3.6.3, 3.6.4
  * User Stories: 2.1
  */
-export default function AdminRequestsPage() {
+function AdminRequestsPageInner() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<AdminRequestViewModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +70,8 @@ export default function AdminRequestsPage() {
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
   const [linkedViewRequest, setLinkedViewRequest] = useState<AdminRequestViewModel | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<RequestCategory | "ALL">("ALL");
+  const [activeTab, setActiveTab] = useState("urgent");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const fetchRequests = async () => {
     try {
@@ -94,6 +97,34 @@ export default function AdminRequestsPage() {
       fetchRequests();
     }
   }, [user]);
+
+  // Deep link from the dashboard: ?request=<id> selects the right tab and
+  // scrolls the matching card into view with a brief highlight.
+  useEffect(() => {
+    const target = searchParams.get("request");
+    if (!target || requests.length === 0) return;
+    const match = requests.find((r) => r.id === target);
+    if (!match) return;
+
+    setActiveTab(
+      match.status === "CLOSED"
+        ? "completed"
+        : ["HIGH", "CRITICAL"].includes(match.urgency)
+        ? "urgent"
+        : "regular"
+    );
+    setHighlightId(target);
+    const scroll = setTimeout(() => {
+      document
+        .getElementById(`request-${target}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    const clear = setTimeout(() => setHighlightId(null), 3200);
+    return () => {
+      clearTimeout(scroll);
+      clearTimeout(clear);
+    };
+  }, [searchParams, requests]);
 
   const handleRequestUpdated = (updatedRequest?: {
     id: string;
@@ -265,7 +296,7 @@ export default function AdminRequestsPage() {
         ))}
       </div>
 
-      <Tabs defaultValue="urgent" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="urgent">
             Urgent Requests
@@ -291,7 +322,13 @@ export default function AdminRequestsPage() {
           <div className="space-y-4">
             {urgentRequests.length > 0 ? (
               urgentRequests.map((request) => (
-                <Card key={request.id} className="border-red-200 bg-red-50">
+                <Card
+                  key={request.id}
+                  id={`request-${request.id}`}
+                  className={`scroll-mt-24 border-red-200 bg-red-50 ${
+                    highlightId === request.id ? "ring-2 ring-primary ring-offset-2" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
@@ -369,7 +406,13 @@ export default function AdminRequestsPage() {
           <div className="space-y-4">
             {regularRequests.length > 0 ? (
               regularRequests.map((request) => (
-                <Card key={request.id}>
+                <Card
+                  key={request.id}
+                  id={`request-${request.id}`}
+                  className={`scroll-mt-24 ${
+                    highlightId === request.id ? "ring-2 ring-primary ring-offset-2" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
@@ -445,7 +488,13 @@ export default function AdminRequestsPage() {
           <div className="space-y-4">
             {completedRequests.length > 0 ? (
               completedRequests.map((request) => (
-                <Card key={request.id}>
+                <Card
+                  key={request.id}
+                  id={`request-${request.id}`}
+                  className={`scroll-mt-24 ${
+                    highlightId === request.id ? "ring-2 ring-primary ring-offset-2" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
@@ -615,4 +664,20 @@ export default function AdminRequestsPage() {
       />
     </PageShell>
   );
-} 
+}
+
+export default function AdminRequestsPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell>
+          <div className="flex min-h-[400px] items-center justify-center">
+            <p className="text-muted-foreground">Loading…</p>
+          </div>
+        </PageShell>
+      }
+    >
+      <AdminRequestsPageInner />
+    </Suspense>
+  );
+}

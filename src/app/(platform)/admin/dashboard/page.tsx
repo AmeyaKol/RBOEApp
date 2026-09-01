@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
-import { 
-  Users,
+import { ADMIN_NAV_GROUPS } from "@/components/layout/admin-nav-items";
+import {
   MessageSquare,
   Clock,
   AlertCircle,
   Eye,
   FileText,
   GraduationCap,
-  Loader2
+  Loader2,
+  ArrowRight,
 } from "lucide-react";
 
 interface DashboardData {
@@ -47,6 +48,7 @@ interface DashboardData {
     university_name: string;
     program_name?: string;
     status?: string;
+    student_id?: string;
     profiles?: {
       full_name: string;
     };
@@ -61,16 +63,11 @@ interface DashboardData {
 
 /**
  * Admin Dashboard Page
- * 
- * Features:
- * - Major action cards (Manage Students, View Requests)
- * - Recent support requests
- * - Application status for assigned students only
- * - Calendar-style upcoming deadlines
- * - Recent student activity tracking
- * - Student onboarding system
- * - University research portal
- * 
+ *
+ * The dashboard doubles as the admin home: a card grid routes to every
+ * workspace area (mirroring the "Switch workspace" dropdown in the nav), and
+ * live widgets below surface pending requests, deadlines, and recent activity.
+ *
  * SRS Requirements: 3.2.1
  * User Stories: 2.1, 2.2
  */
@@ -105,6 +102,16 @@ export default function AdminDashboardPage() {
     }
   }, [user]);
 
+  // Live count badges for the workspace cards, keyed by href.
+  const cardMeta: Record<string, string | undefined> = {
+    "/admin/students": dashboardData
+      ? `${dashboardData.stats.totalStudents} student${dashboardData.stats.totalStudents === 1 ? "" : "s"}`
+      : undefined,
+    "/admin/requests": dashboardData
+      ? `${dashboardData.stats.pendingRequests} pending`
+      : undefined,
+  };
+
   if (loading) {
     return (
       <PageShell>
@@ -130,58 +137,48 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Major Action Cards */}
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Card className="cursor-pointer border-border transition-colors hover:border-primary/40">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3 text-foreground">
-              <Users className="h-8 w-8 text-primary" />
-              <div>
-                <div className="text-xl">Manage Students</div>
-                <div className="text-sm font-normal text-muted-foreground">
-                  {dashboardData?.stats.totalStudents || 0} students assigned to you
-                </div>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-muted-foreground">
-              View and manage all students assigned to you, track their progress, and update their application status.
-            </p>
-            <Link href="/admin/students">
-              <Button className="w-full">
-                <Users className="mr-2 h-4 w-4" />
-                Open Student Management
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer border-border transition-colors hover:border-primary/40">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3 text-foreground">
-              <MessageSquare className="h-8 w-8 text-primary" />
-              <div>
-                <div className="text-xl">View Requests</div>
-                <div className="text-sm font-normal text-muted-foreground">
-                  {dashboardData?.stats.pendingRequests || 0} requests pending
-                </div>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-muted-foreground">
-              Review and respond to student requests, prioritize urgent items, and track resolution progress.
-            </p>
-            <Link href="/admin/requests">
-              <Button className="w-full" variant="secondary">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Open Request Center
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Workspace card grid — routes to every admin area */}
+      {ADMIN_NAV_GROUPS.map((group) => {
+        const items = group.items.filter((i) => i.href !== "/admin/dashboard");
+        if (items.length === 0) return null;
+        return (
+          <section key={group.id} className="mb-8">
+            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              {group.label}
+            </h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map(({ href, label, description, icon: Icon, preview }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="group flex flex-col rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {preview && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                          Preview
+                        </span>
+                      )}
+                      {cardMeta[href] && (
+                        <Badge variant="secondary" className="text-xs">
+                          {cardMeta[href]}
+                        </Badge>
+                      )}
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </div>
+                  <p className="font-medium text-foreground">{label}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        );
+      })}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
@@ -191,19 +188,17 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Recent Support Requests</CardTitle>
-                <Link href="/admin/requests">
-                  <Button variant="outline" size="sm">
-                    View All
-                  </Button>
-                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/admin/requests">View All</Link>
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {dashboardData?.recentRequests.length ? (
                   dashboardData.recentRequests.map((request) => (
-                    <div 
-                      key={request.id} 
+                    <div
+                      key={request.id}
                       className={`flex items-center justify-between p-4 border rounded-lg ${
                         request.is_urgent ? 'border-red-200 bg-red-50' : ''
                       }`}
@@ -223,12 +218,12 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         {request.is_urgent && <Badge variant="destructive">Urgent</Badge>}
-                        <Link href="/admin/requests">
-                          <Button size="sm">
+                        <Button asChild size="sm">
+                          <Link href={`/admin/requests?request=${request.id}`}>
                             <Eye className="h-4 w-4 mr-1" />
                             View
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       </div>
                     </div>
                   ))
@@ -279,43 +274,14 @@ export default function AdminDashboardPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Link href="/admin/onboarding">
-                <Button variant="outline" className="w-full justify-start">
-                  <Users className="mr-2 h-4 w-4" />
-                  Student onboarding
-                </Button>
-              </Link>
-              <Link href="/admin/university-research">
-                <Button variant="outline" className="w-full justify-start">
-                  <GraduationCap className="mr-2 h-4 w-4" />
-                  University research
-                </Button>
-              </Link>
-              <Link href="/admin/alumni-outreach">
-                <Button variant="outline" className="w-full justify-start">
-                  <Users className="mr-2 h-4 w-4" />
-                  Alumni outreach
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
           {/* College Deadlines Calendar */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>College Deadlines</CardTitle>
-                <Link href="/admin/calendar">
-                  <Button variant="outline" size="sm">
-                    Full Calendar
-                  </Button>
-                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/admin/calendar">Full Calendar</Link>
+                </Button>
               </div>
               <CardDescription>Next application deadlines across your students</CardDescription>
             </CardHeader>
@@ -328,16 +294,15 @@ export default function AdminDashboardPage() {
                     );
                     const urgent = days <= 3;
                     const soon = days <= 14;
-                    return (
+                    const row = (
                       <div
-                        key={i}
                         className={`flex items-center justify-between rounded border p-2 ${
                           urgent
                             ? "border-red-200 bg-red-50"
                             : soon
                             ? "border-yellow-200 bg-yellow-50"
                             : "border-border"
-                        }`}
+                        } ${d.student_id ? "transition-colors hover:bg-accent/50" : ""}`}
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">
@@ -356,6 +321,13 @@ export default function AdminDashboardPage() {
                           {days <= 0 ? "Due" : days === 1 ? "Tomorrow" : `${days} days`}
                         </Badge>
                       </div>
+                    );
+                    return d.student_id ? (
+                      <Link key={i} href={`/admin/students/${d.student_id}`} className="block">
+                        {row}
+                      </Link>
+                    ) : (
+                      <div key={i}>{row}</div>
                     );
                   })}
                   <div className="mt-3 text-xs text-muted-foreground">
@@ -406,12 +378,12 @@ export default function AdminDashboardPage() {
               )}
 
               <div className="mt-4 pt-3 border-t">
-                <Link href="/admin/activity-log">
-                  <Button variant="outline" size="sm" className="w-full">
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href="/admin/activity-log">
                     <Clock className="w-4 h-4 mr-2" />
                     View Full Activity Log
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

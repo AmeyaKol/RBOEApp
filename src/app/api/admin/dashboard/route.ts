@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { buildAdminActivity } from '@/lib/admin-activity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
         university_name,
         program_name,
         status,
+        student_id,
         profiles!applications_student_id_fkey (
           full_name
         )
@@ -82,46 +84,7 @@ export async function GET(request: NextRequest) {
       .limit(8);
 
     // Build a recent-activity feed from the latest request / document / application changes
-    const [recentDocs, recentApps] = await Promise.all([
-      supabase
-        .from('documents')
-        .select('id, title, type, updated_at, profiles!documents_student_id_fkey ( full_name )')
-        .order('updated_at', { ascending: false })
-        .limit(6),
-      supabase
-        .from('applications')
-        .select('id, university_name, status, updated_at, profiles!applications_student_id_fkey ( full_name )')
-        .order('updated_at', { ascending: false })
-        .limit(6),
-    ]);
-
-    type ActivityItem = { kind: 'request' | 'document' | 'application'; text: string; detail: string; at: string };
-    const activity: ActivityItem[] = [];
-    for (const r of recentRequests || []) {
-      activity.push({
-        kind: 'request',
-        text: `${r.profiles?.full_name || 'A student'} — ${r.title}`,
-        detail: r.is_urgent ? 'Urgent request' : 'New request',
-        at: r.created_at,
-      });
-    }
-    for (const d of recentDocs.data || []) {
-      activity.push({
-        kind: 'document',
-        text: `${d.profiles?.full_name || 'A student'} updated ${d.title}`,
-        detail: `${d.type} document`,
-        at: d.updated_at,
-      });
-    }
-    for (const a of recentApps.data || []) {
-      activity.push({
-        kind: 'application',
-        text: `${a.profiles?.full_name || 'A student'} — ${a.university_name}`,
-        detail: `Application ${String(a.status).toLowerCase()}`,
-        at: a.updated_at,
-      });
-    }
-    activity.sort((x, y) => new Date(y.at).getTime() - new Date(x.at).getTime());
+    const activity = await buildAdminActivity(supabase, 8);
 
     // Calculate application stats
     const acceptedCount = applicationStats?.filter(app => app.status === 'ACCEPTED').length || 0;
@@ -147,7 +110,7 @@ export async function GET(request: NextRequest) {
       },
       recentRequests: recentRequests || [],
       upcomingDeadlines: deadlines || [],
-      recentActivity: activity.slice(0, 8),
+      recentActivity: activity,
     };
 
     return NextResponse.json(dashboardData);
