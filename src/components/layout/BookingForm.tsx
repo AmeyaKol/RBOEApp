@@ -28,6 +28,7 @@ import { CalendarDays, Clock, CheckCircle, Phone, Mail, MapPin } from "lucide-re
 export function BookingForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -41,17 +42,30 @@ export function BookingForm() {
       ...prev,
       [field]: value
     }));
+    if (submitError) setSubmitError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsLoading(false);
-    setIsSubmitted(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch("/api/onboarding/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Something went wrong. Please try again.");
+      }
+      setIsSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const contactInfo = [
@@ -144,6 +158,9 @@ export function BookingForm() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
+                {submitError && (
+                  <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{submitError}</div>
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name *</Label>

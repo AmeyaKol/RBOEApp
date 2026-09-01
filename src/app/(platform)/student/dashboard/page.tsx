@@ -34,6 +34,7 @@ interface UserProfile {
   toefl_score: number;
   undergrad_gpa: number;
   work_experience_months: number;
+  onboarding_stage?: string | null;
 }
 
 /**
@@ -133,6 +134,23 @@ export default function StudentDashboardPage() {
       {error && (
         <div className="-mt-2 mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {profile?.onboarding_stage &&
+        !["ACTIVE", "SUBMITTED"].includes(profile.onboarding_stage) && (
+          <div className="mb-6 flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Finish onboarding so your counselor can build your university shortlist.
+            </span>
+            <Link href="/student/onboarding">
+              <Button size="sm">Complete your profile</Button>
+            </Link>
+          </div>
+        )}
+      {profile?.onboarding_stage === "SUBMITTED" && (
+        <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+          Your intake is in — your counselor is preparing your recommended college list.
         </div>
       )}
 
