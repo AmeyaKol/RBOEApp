@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, PageShell } from "@/components/shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +72,9 @@ function AdminRequestsPageInner() {
   const [categoryFilter, setCategoryFilter] = useState<RequestCategory | "ALL">("ALL");
   const [activeTab, setActiveTab] = useState("urgent");
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  // Deep link is consumed once; later setRequests calls (responses, refetch)
+  // must not re-snap the tab or re-highlight.
+  const consumedDeepLink = useRef<string | null>(null);
 
   const fetchRequests = async () => {
     try {
@@ -103,8 +106,10 @@ function AdminRequestsPageInner() {
   useEffect(() => {
     const target = searchParams.get("request");
     if (!target || requests.length === 0) return;
+    if (consumedDeepLink.current === target) return;
     const match = requests.find((r) => r.id === target);
     if (!match) return;
+    consumedDeepLink.current = target;
 
     setActiveTab(
       match.status === "CLOSED"
