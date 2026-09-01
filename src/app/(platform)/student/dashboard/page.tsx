@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { EditProfileModal } from "@/components/features/EditProfileModal";
-import { 
-  FileText, 
-  GraduationCap, 
-  MessageSquare, 
+import {
+  FileText,
+  GraduationCap,
+  MessageSquare,
   Plus,
-  Search,
+  Plane,
   Users,
   Loader2
 } from "lucide-react";
@@ -204,16 +204,16 @@ export default function StudentDashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/student/applications">
+        <Link href="/student/visa">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="rounded-lg border border-border bg-card p-2">
-                  <Search className="h-6 w-6 text-primary" />
+                  <Plane className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Research Programs</h3>
-                  <p className="text-sm text-muted-foreground">Find universities</p>
+                  <h3 className="font-semibold">Visa Mock</h3>
+                  <p className="text-sm text-muted-foreground">Schedule a mock interview</p>
                 </div>
               </div>
             </CardContent>
