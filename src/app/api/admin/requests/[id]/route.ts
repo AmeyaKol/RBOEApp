@@ -51,6 +51,13 @@ export async function PUT(
       updateData.admin_response = updates.admin_response;
       updateData.responded_at = new Date().toISOString();
     }
+    if (
+      typeof updates.urgency === "string" &&
+      ["LOW", "NORMAL", "HIGH", "CRITICAL"].includes(updates.urgency)
+    ) {
+      // admin re-triage; the sync trigger updates is_urgent
+      updateData.urgency = updates.urgency;
+    }
 
     const { data: updatedRequest, error: updateError } = await supabase
       .from('requests')

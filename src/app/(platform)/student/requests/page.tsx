@@ -15,7 +15,6 @@ import {
   MessageSquare,
   Clock,
   CheckCircle,
-  AlertCircle,
   Send,
   Loader2,
   FileText,
@@ -23,11 +22,29 @@ import {
 } from "lucide-react";
 import {
   mapApiStudentRequestToViewModel,
+  URGENCY_META,
+  CATEGORY_LABEL,
   type ApiStudentRequestRow,
   type StudentRequestViewModel,
+  type RequestUrgency,
+  type RequestCategory,
 } from "@/lib/view-models/request";
 
 type Regarding = "general" | "document" | "application";
+
+const URGENCY_OPTIONS: RequestUrgency[] = ["LOW", "NORMAL", "HIGH", "CRITICAL"];
+const CATEGORY_OPTIONS: RequestCategory[] = [
+  "CHAT",
+  "DOCUMENT_EDIT",
+  "COLLEGE_LIST",
+  "VISA_MOCK",
+  "OTHER",
+];
+const DEFAULT_CATEGORY: Record<Regarding, RequestCategory> = {
+  general: "CHAT",
+  document: "DOCUMENT_EDIT",
+  application: "COLLEGE_LIST",
+};
 
 interface DocOption {
   id: string;
@@ -60,7 +77,8 @@ export default function StudentRequestsPage() {
   const [formData, setFormData] = useState({
     regarding: "general" as Regarding,
     linkedId: "",
-    priority: "normal",
+    urgency: "NORMAL" as RequestUrgency,
+    category: "CHAT" as RequestCategory,
     title: "",
     description: "",
     urgentReason: "",
@@ -70,7 +88,8 @@ export default function StudentRequestsPage() {
     setFormData({
       regarding: "general",
       linkedId: "",
-      priority: "normal",
+      urgency: "NORMAL",
+      category: "CHAT",
       title: "",
       description: "",
       urgentReason: "",
@@ -122,21 +141,26 @@ export default function StudentRequestsPage() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => {
-      const next = { ...prev, [field]: value };
-      // Changing the "regarding" category clears any previously picked item.
-      if (field === "regarding") next.linkedId = "";
+      const next = { ...prev, [field]: value } as typeof prev;
+      // Changing the "regarding" category clears the linked item and picks a
+      // sensible default request category.
+      if (field === "regarding") {
+        next.linkedId = "";
+        next.category = DEFAULT_CATEGORY[value as Regarding];
+      }
       return next;
     });
     if (error) setError(null);
     if (success) setSuccess(null);
   };
 
+  const needsReason = formData.urgency === "HIGH" || formData.urgency === "CRITICAL";
   const linkRequired = formData.regarding !== "general";
   const canSubmit =
     !!formData.title &&
     !!formData.description &&
     (!linkRequired || !!formData.linkedId) &&
-    (formData.priority !== "urgent" || !!formData.urgentReason) &&
+    (!needsReason || !!formData.urgentReason) &&
     !submitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,8 +174,9 @@ export default function StudentRequestsPage() {
       const body: Record<string, unknown> = {
         title: formData.title,
         description: formData.description,
-        is_urgent: formData.priority === "urgent",
-        urgent_reason: formData.priority === "urgent" ? formData.urgentReason : null,
+        urgency: formData.urgency,
+        category: formData.category,
+        urgent_reason: needsReason ? formData.urgentReason : null,
       };
       if (formData.regarding === "document" && formData.linkedId) {
         body.document_id = formData.linkedId;
@@ -296,7 +321,7 @@ export default function StudentRequestsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="space-y-2">
                     <Label htmlFor="regarding">Regarding</Label>
                     <select
@@ -313,17 +338,38 @@ export default function StudentRequestsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="priority">Priority</Label>
+                    <Label htmlFor="category">Topic</Label>
                     <select
-                      id="priority"
+                      id="category"
                       className="w-full p-2 border rounded-md"
-                      value={formData.priority}
-                      onChange={(e) => handleInputChange("priority", e.target.value)}
+                      value={formData.category}
+                      onChange={(e) => handleInputChange("category", e.target.value)}
                       disabled={submitting}
                     >
-                      <option value="normal">Normal</option>
-                      <option value="urgent">Urgent</option>
+                      {CATEGORY_OPTIONS.map((c) => (
+                        <option key={c} value={c}>
+                          {CATEGORY_LABEL[c]}
+                        </option>
+                      ))}
                     </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="urgency">Urgency</Label>
+                    <select
+                      id="urgency"
+                      className="w-full p-2 border rounded-md"
+                      value={formData.urgency}
+                      onChange={(e) => handleInputChange("urgency", e.target.value)}
+                      disabled={submitting}
+                    >
+                      {URGENCY_OPTIONS.map((u) => (
+                        <option key={u} value={u}>
+                          {URGENCY_META[u].label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">{URGENCY_META[formData.urgency].sla}</p>
                   </div>
                 </div>
 
@@ -406,9 +452,9 @@ export default function StudentRequestsPage() {
                   />
                 </div>
 
-                {formData.priority === "urgent" && (
+                {needsReason && (
                   <div className="space-y-2 mb-4">
-                    <Label htmlFor="urgentReason">Urgent Reason *</Label>
+                    <Label htmlFor="urgentReason">Why is this {URGENCY_META[formData.urgency].label.toLowerCase()}? *</Label>
                     <Textarea
                       id="urgentReason"
                       placeholder="Explain why this request is urgent (e.g., deadline approaching)"
@@ -453,13 +499,17 @@ export default function StudentRequestsPage() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           {getStatusIcon(request.status)}
-                          {request.isUrgent && <AlertCircle className="h-4 w-4 text-red-600" />}
                           <Badge className={getStatusBadgeColor(request.status)}>
                             {request.status.replace("_", " ")}
                           </Badge>
-                          {request.isUrgent && <Badge variant="destructive">Urgent</Badge>}
+                          <Badge className={`text-xs ${URGENCY_META[request.urgency].badgeClass}`}>
+                            {URGENCY_META[request.urgency].label}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {CATEGORY_LABEL[request.category]}
+                          </Badge>
                           {renderLinkBadge(request)}
                         </div>
                         <CardTitle className="text-lg">{request.title}</CardTitle>
@@ -520,9 +570,12 @@ export default function StudentRequestsPage() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <CheckCircle className="h-4 w-4 text-green-600" />
                           <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {CATEGORY_LABEL[request.category]}
+                          </Badge>
                           {renderLinkBadge(request)}
                         </div>
                         <CardTitle className="text-lg">{request.title}</CardTitle>
