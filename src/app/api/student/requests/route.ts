@@ -62,6 +62,23 @@ export async function POST(request: NextRequest) {
 
     const requestData = await request.json();
 
+    const URGENCIES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'];
+    const CATEGORIES = ['CHAT', 'DOCUMENT_EDIT', 'COLLEGE_LIST', 'VISA_MOCK', 'OTHER'];
+
+    // Graded urgency (falls back to the legacy is_urgent boolean). The
+    // sync_request_is_urgent trigger keeps is_urgent in step with urgency.
+    const urgency = URGENCIES.includes(requestData.urgency)
+      ? requestData.urgency
+      : requestData.is_urgent
+        ? 'HIGH'
+        : 'NORMAL';
+
+    const category = CATEGORIES.includes(requestData.category)
+      ? requestData.category
+      : requestData.document_id
+        ? 'DOCUMENT_EDIT'
+        : 'CHAT';
+
     // Create new request
     const { data: newRequest, error: createError } = await supabase
       .from('requests')
@@ -70,7 +87,8 @@ export async function POST(request: NextRequest) {
         title: requestData.title,
         description: requestData.description,
         status: 'OPEN',
-        is_urgent: requestData.is_urgent || false,
+        urgency,
+        category,
         urgent_reason: requestData.urgent_reason || null,
         // A request can link a document or a university application (not both).
         // These columns require migration 001.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader, PageShell } from "@/components/shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { CommentThread } from "@/components/features/CommentThread";
+import { DocumentEditor } from "@/components/features/DocumentEditor";
 import {
   ArrowLeft,
   GraduationCap,
@@ -53,7 +54,15 @@ interface StudentDetail {
 }
 
 type Viewer =
-  | { kind: "document"; id: string; title: string; subtitle: string; content: string }
+  | {
+      kind: "document";
+      id: string;
+      title: string;
+      subtitle: string;
+      content: string;
+      docType: string;
+      version: number;
+    }
   | { kind: "application"; id: string; title: string; subtitle: string };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -79,25 +88,24 @@ export default function StudentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [viewer, setViewer] = useState<Viewer | null>(null);
 
+  const fetchStudent = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/students/${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch student");
+      const data = await res.json();
+      setStudent(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load student");
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) { setLoading(false); return; }
-
-    const fetchStudent = async () => {
-      try {
-        const res = await fetch(`/api/admin/students/${userId}`);
-        if (!res.ok) throw new Error("Failed to fetch student");
-        const data = await res.json();
-        setStudent(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load student");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchStudent();
-  }, [user, authLoading, userId]);
+  }, [user, authLoading, fetchStudent]);
 
   if (loading) {
     return (
@@ -251,18 +259,20 @@ export default function StudentDetailPage() {
                         kind: "document",
                         id: doc.id,
                         title: doc.title,
-                        subtitle: `${doc.type}${doc.is_master ? " • master" : ""}`,
+                        subtitle: `${doc.type}${doc.is_master ? " • master" : ""} • v${doc.version}`,
                         content: doc.content || "",
+                        docType: doc.type,
+                        version: doc.version,
                       })
                     }
                     className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-muted"
                   >
                     <div>
                       <span className="font-medium">{doc.title}</span>
-                      <span className="text-muted-foreground"> — {doc.type}</span>
+                      <span className="text-muted-foreground"> — {doc.type} · v{doc.version}</span>
                     </div>
                     <span className="text-muted-foreground text-xs">
-                      Updated {new Date(doc.updated_at).toLocaleDateString()}
+                      Edit · updated {new Date(doc.updated_at).toLocaleDateString()}
                     </span>
                   </button>
                 ))}
@@ -303,7 +313,7 @@ export default function StudentDetailPage() {
         </Card>
       </div>
 
-      {/* Read-only viewer + comment thread */}
+      {/* Document editor / application viewer + comment thread */}
       {viewer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[85vh] flex flex-col">
@@ -319,20 +329,20 @@ export default function StudentDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="overflow-y-auto flex-1 space-y-4">
-              {viewer.kind === "document" &&
-                (viewer.content ? (
-                  <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
-                    {viewer.content}
-                  </pre>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No content.</p>
-                ))}
-              <div className="border-t pt-4">
-                <CommentThread
-                  documentId={viewer.kind === "document" ? viewer.id : undefined}
-                  applicationId={viewer.kind === "application" ? viewer.id : undefined}
+              {viewer.kind === "document" ? (
+                <DocumentEditor
+                  documentId={viewer.id}
+                  title={viewer.title}
+                  type={viewer.docType}
+                  initialContent={viewer.content}
+                  initialVersion={viewer.version}
+                  onSaved={() => fetchStudent()}
                 />
-              </div>
+              ) : (
+                <div className="border-t pt-4">
+                  <CommentThread applicationId={viewer.id} />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { EditProfileModal } from "@/components/features/EditProfileModal";
-import { 
-  FileText, 
-  GraduationCap, 
-  MessageSquare, 
+import {
+  FileText,
+  GraduationCap,
+  MessageSquare,
   Plus,
-  Search,
+  Plane,
   Users,
   Loader2
 } from "lucide-react";
@@ -34,6 +34,7 @@ interface UserProfile {
   toefl_score: number;
   undergrad_gpa: number;
   work_experience_months: number;
+  onboarding_stage?: string | null;
 }
 
 /**
@@ -136,6 +137,23 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
+      {profile?.onboarding_stage &&
+        !["ACTIVE", "SUBMITTED"].includes(profile.onboarding_stage) && (
+          <div className="mb-6 flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Finish onboarding so your counselor can build your university shortlist.
+            </span>
+            <Link href="/student/onboarding">
+              <Button size="sm">Complete your profile</Button>
+            </Link>
+          </div>
+        )}
+      {profile?.onboarding_stage === "SUBMITTED" && (
+        <div className="mb-6 rounded-md border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+          Your intake is in — your counselor is preparing your recommended college list.
+        </div>
+      )}
+
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Link href="/student/applications">
@@ -186,16 +204,16 @@ export default function StudentDashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/student/applications">
+        <Link href="/student/visa">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="rounded-lg border border-border bg-card p-2">
-                  <Search className="h-6 w-6 text-primary" />
+                  <Plane className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Research Programs</h3>
-                  <p className="text-sm text-muted-foreground">Find universities</p>
+                  <h3 className="font-semibold">Visa Mock</h3>
+                  <p className="text-sm text-muted-foreground">Schedule a mock interview</p>
                 </div>
               </div>
             </CardContent>

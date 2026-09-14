@@ -8,8 +8,9 @@ The following routes are linked in UI but do not currently have page implementat
 - `/privacy`
 - `/terms`
 - `/cookies`
-- `/admin/calendar`
-- `/admin/activity-log`
+
+`/admin/calendar` and `/admin/activity-log` are now implemented on real data
+(`GET /api/admin/calendar`, `GET /api/admin/activity-log`).
 
 ## Mixed Data-Mode Risks
 

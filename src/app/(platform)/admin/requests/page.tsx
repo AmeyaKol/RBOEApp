@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, PageShell } from "@/components/shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminResponseModal } from "@/components/features/AdminResponseModal";
 import { CommentThread } from "@/components/features/CommentThread";
+import { DocumentEditor } from "@/components/features/DocumentEditor";
 import { useAuth } from "@/hooks/useAuth";
 import {
   MessageSquare,
@@ -25,9 +26,26 @@ import {
 } from "lucide-react";
 import {
   mapApiAdminRequestToViewModel,
+  URGENCY_META,
+  URGENCY_RANK,
+  CATEGORY_LABEL,
   type AdminRequestViewModel,
   type ApiAdminRequestRow,
+  type RequestCategory,
 } from "@/lib/view-models/request";
+
+const CATEGORY_FILTERS: Array<RequestCategory | "ALL"> = [
+  "ALL",
+  "CHAT",
+  "DOCUMENT_EDIT",
+  "COLLEGE_LIST",
+  "VISA_MOCK",
+  "OTHER",
+];
+
+const byUrgencyThenDate = (a: AdminRequestViewModel, b: AdminRequestViewModel) =>
+  URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency] ||
+  new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 
 /**
  * Admin Requests Page
@@ -41,15 +59,22 @@ import {
  * SRS Requirements: 3.6.3, 3.6.4
  * User Stories: 2.1
  */
-export default function AdminRequestsPage() {
+function AdminRequestsPageInner() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<AdminRequestViewModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<AdminRequestViewModel | null>(null);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
   const [linkedViewRequest, setLinkedViewRequest] = useState<AdminRequestViewModel | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<RequestCategory | "ALL">("ALL");
+  const [activeTab, setActiveTab] = useState("urgent");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  // Deep link is consumed once; later setRequests calls (responses, refetch)
+  // must not re-snap the tab or re-highlight.
+  const consumedDeepLink = useRef<string | null>(null);
 
   const fetchRequests = async () => {
     try {
@@ -75,6 +100,36 @@ export default function AdminRequestsPage() {
       fetchRequests();
     }
   }, [user]);
+
+  // Deep link from the dashboard: ?request=<id> selects the right tab and
+  // scrolls the matching card into view with a brief highlight.
+  useEffect(() => {
+    const target = searchParams.get("request");
+    if (!target || requests.length === 0) return;
+    if (consumedDeepLink.current === target) return;
+    const match = requests.find((r) => r.id === target);
+    if (!match) return;
+    consumedDeepLink.current = target;
+
+    setActiveTab(
+      match.status === "CLOSED"
+        ? "completed"
+        : ["HIGH", "CRITICAL"].includes(match.urgency)
+        ? "urgent"
+        : "regular"
+    );
+    setHighlightId(target);
+    const scroll = setTimeout(() => {
+      document
+        .getElementById(`request-${target}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    const clear = setTimeout(() => setHighlightId(null), 3200);
+    return () => {
+      clearTimeout(scroll);
+      clearTimeout(clear);
+    };
+  }, [searchParams, requests]);
 
   const handleRequestUpdated = (updatedRequest?: {
     id: string;
@@ -137,18 +192,31 @@ export default function AdminRequestsPage() {
     }
   };
 
-  // Separate requests by urgency and status
+  // Category filter, then split by urgency band + status, sorted by urgency.
+  const visible = useMemo(
+    () =>
+      categoryFilter === "ALL"
+        ? requests
+        : requests.filter((req) => req.category === categoryFilter),
+    [requests, categoryFilter]
+  );
   const urgentRequests = useMemo(
-    () => requests.filter((req) => req.isUrgent && req.status !== 'CLOSED'),
-    [requests]
+    () =>
+      visible
+        .filter((req) => ["HIGH", "CRITICAL"].includes(req.urgency) && req.status !== "CLOSED")
+        .sort(byUrgencyThenDate),
+    [visible]
   );
   const regularRequests = useMemo(
-    () => requests.filter((req) => !req.isUrgent && req.status !== 'CLOSED'),
-    [requests]
+    () =>
+      visible
+        .filter((req) => ["LOW", "NORMAL"].includes(req.urgency) && req.status !== "CLOSED")
+        .sort(byUrgencyThenDate),
+    [visible]
   );
   const completedRequests = useMemo(
-    () => requests.filter((req) => req.status === 'CLOSED'),
-    [requests]
+    () => visible.filter((req) => req.status === "CLOSED"),
+    [visible]
   );
 
   // Calculate statistics
@@ -158,6 +226,18 @@ export default function AdminRequestsPage() {
     inProgress: requests.filter(req => req.status === 'IN_PROGRESS').length,
     completed: completedRequests.length
   };
+
+  const renderUrgencyBadge = (request: AdminRequestViewModel) => (
+    <Badge className={`text-xs ${URGENCY_META[request.urgency].badgeClass}`}>
+      {URGENCY_META[request.urgency].label}
+    </Badge>
+  );
+
+  const renderCategoryBadge = (request: AdminRequestViewModel) => (
+    <Badge variant="outline" className="text-xs">
+      {CATEGORY_LABEL[request.category]}
+    </Badge>
+  );
 
   const renderLinkBadge = (request: AdminRequestViewModel) => {
     if (request.link.kind === "document") {
@@ -204,7 +284,24 @@ export default function AdminRequestsPage() {
         </div>
       )}
 
-      <Tabs defaultValue="urgent" className="space-y-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Topic:</span>
+        {CATEGORY_FILTERS.map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategoryFilter(c)}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+              categoryFilter === c
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {c === "ALL" ? "All" : CATEGORY_LABEL[c]}
+          </button>
+        ))}
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="urgent">
             Urgent Requests
@@ -230,13 +327,20 @@ export default function AdminRequestsPage() {
           <div className="space-y-4">
             {urgentRequests.length > 0 ? (
               urgentRequests.map((request) => (
-                <Card key={request.id} className="border-red-200 bg-red-50">
+                <Card
+                  key={request.id}
+                  id={`request-${request.id}`}
+                  className={`scroll-mt-24 border-red-200 bg-red-50 ${
+                    highlightId === request.id ? "ring-2 ring-primary ring-offset-2" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <AlertCircle className="h-4 w-4 text-red-600" />
-                          <Badge variant="destructive">Urgent</Badge>
+                          {renderUrgencyBadge(request)}
+                          {renderCategoryBadge(request)}
                           {renderLinkBadge(request)}
                         </div>
                         <CardTitle className="text-lg">{request.title}</CardTitle>
@@ -264,7 +368,7 @@ export default function AdminRequestsPage() {
                       </div>
                       <div className="flex items-center space-x-1">
                         <Clock className="h-4 w-4" />
-                        <span>Expected response: Today</span>
+                        <span>{URGENCY_META[request.urgency].sla}</span>
                       </div>
                     </div>
                     <div className="flex space-x-2">
@@ -307,11 +411,19 @@ export default function AdminRequestsPage() {
           <div className="space-y-4">
             {regularRequests.length > 0 ? (
               regularRequests.map((request) => (
-                <Card key={request.id}>
+                <Card
+                  key={request.id}
+                  id={`request-${request.id}`}
+                  className={`scroll-mt-24 ${
+                    highlightId === request.id ? "ring-2 ring-primary ring-offset-2" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          {renderUrgencyBadge(request)}
+                          {renderCategoryBadge(request)}
                           {renderLinkBadge(request)}
                         </div>
                         <CardTitle className="text-lg">{request.title}</CardTitle>
@@ -381,13 +493,20 @@ export default function AdminRequestsPage() {
           <div className="space-y-4">
             {completedRequests.length > 0 ? (
               completedRequests.map((request) => (
-                <Card key={request.id}>
+                <Card
+                  key={request.id}
+                  id={`request-${request.id}`}
+                  className={`scroll-mt-24 ${
+                    highlightId === request.id ? "ring-2 ring-primary ring-offset-2" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <CheckCircle className="h-4 w-4 text-green-600" />
                           <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                          {renderCategoryBadge(request)}
                           {renderLinkBadge(request)}
                         </div>
                         <CardTitle className="text-lg">{request.title}</CardTitle>
@@ -498,26 +617,24 @@ export default function AdminRequestsPage() {
               </div>
             </CardHeader>
             <CardContent className="overflow-y-auto flex-1 space-y-4">
-              {linkedViewRequest.link.kind === "document" &&
-                (linkedViewRequest.documentContent ? (
-                  <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
-                    {linkedViewRequest.documentContent}
-                  </pre>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No content available.</p>
-                ))}
-              <div className="border-t pt-4">
-                <CommentThread
-                  documentId={
-                    linkedViewRequest.link.kind === "document" ? linkedViewRequest.link.id : undefined
-                  }
-                  applicationId={
-                    linkedViewRequest.link.kind === "application"
-                      ? linkedViewRequest.link.id
-                      : undefined
-                  }
+              {linkedViewRequest.link.kind === "document" && linkedViewRequest.link.id ? (
+                <DocumentEditor
+                  documentId={linkedViewRequest.link.id}
+                  title={linkedViewRequest.documentTitle || "Document"}
+                  type={linkedViewRequest.documentType || "SOP"}
+                  initialContent={linkedViewRequest.documentContent || ""}
+                  initialVersion={linkedViewRequest.documentVersion ?? 1}
+                  linkedRequestId={linkedViewRequest.id}
+                  onSaved={({ resolvedRequest }) => {
+                    fetchRequests();
+                    if (resolvedRequest) setLinkedViewRequest(null);
+                  }}
                 />
-              </div>
+              ) : (
+                <div className="border-t pt-4">
+                  <CommentThread applicationId={linkedViewRequest.link.id} />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -552,4 +669,20 @@ export default function AdminRequestsPage() {
       />
     </PageShell>
   );
-} 
+}
+
+export default function AdminRequestsPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell>
+          <div className="flex min-h-[400px] items-center justify-center">
+            <p className="text-muted-foreground">Loading…</p>
+          </div>
+        </PageShell>
+      }
+    >
+      <AdminRequestsPageInner />
+    </Suspense>
+  );
+}

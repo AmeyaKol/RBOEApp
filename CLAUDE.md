@@ -175,7 +175,7 @@ The source of truth is **`sql/schema.sql`**, applied by hand in the Supabase SQL
 See BETA_READINESS_REPORT.md and KNOWN_GAPS.md:
 
 **Blocking Issues:**
-- Missing route implementations: `/forgot-password`, `/privacy`, `/terms`, `/cookies`, `/admin/calendar`, `/admin/activity-log`
+- Missing route implementations: `/forgot-password`, `/privacy`, `/terms`, `/cookies`
 - ESLint errors (`no-explicit-any`, `react/no-unescaped-entities`) prevent clean build
 - Mixed demo + Supabase data in some lists
 

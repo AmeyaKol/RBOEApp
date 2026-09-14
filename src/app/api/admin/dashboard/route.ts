@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { buildAdminActivity } from '@/lib/admin-activity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,14 +71,20 @@ export async function GET(request: NextRequest) {
       .select(`
         deadline,
         university_name,
+        program_name,
+        status,
+        student_id,
         profiles!applications_student_id_fkey (
           full_name
         )
       `)
       .not('deadline', 'is', null)
-      .gte('deadline', new Date().toISOString())
+      .gte('deadline', new Date().toISOString().slice(0, 10))
       .order('deadline', { ascending: true })
-      .limit(10);
+      .limit(8);
+
+    // Build a recent-activity feed from the latest request / document / application changes
+    const activity = await buildAdminActivity(supabase, 8);
 
     // Calculate application stats
     const acceptedCount = applicationStats?.filter(app => app.status === 'ACCEPTED').length || 0;
@@ -102,7 +109,8 @@ export async function GET(request: NextRequest) {
         rejected: rejectedCount
       },
       recentRequests: recentRequests || [],
-      upcomingDeadlines: deadlines || []
+      upcomingDeadlines: deadlines || [],
+      recentActivity: activity,
     };
 
     return NextResponse.json(dashboardData);

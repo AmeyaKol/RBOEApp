@@ -1,5 +1,39 @@
 export type RequestStatus = "OPEN" | "IN_PROGRESS" | "CLOSED";
 
+export type RequestUrgency = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+export type RequestCategory =
+  | "CHAT"
+  | "DOCUMENT_EDIT"
+  | "COLLEGE_LIST"
+  | "VISA_MOCK"
+  | "OTHER";
+
+/** Higher = more urgent. Used to sort the admin queue. */
+export const URGENCY_RANK: Record<RequestUrgency, number> = {
+  CRITICAL: 3,
+  HIGH: 2,
+  NORMAL: 1,
+  LOW: 0,
+};
+
+export const URGENCY_META: Record<
+  RequestUrgency,
+  { label: string; badgeClass: string; sla: string }
+> = {
+  CRITICAL: { label: "Critical", badgeClass: "bg-red-600 text-white", sla: "Respond today" },
+  HIGH: { label: "High", badgeClass: "bg-orange-100 text-orange-800", sla: "Respond within 24h" },
+  NORMAL: { label: "Normal", badgeClass: "bg-slate-100 text-slate-700", sla: "Respond within 2–3 days" },
+  LOW: { label: "Low", badgeClass: "bg-slate-100 text-slate-500", sla: "No rush" },
+};
+
+export const CATEGORY_LABEL: Record<RequestCategory, string> = {
+  CHAT: "Chat / question",
+  DOCUMENT_EDIT: "Document edit",
+  COLLEGE_LIST: "College list",
+  VISA_MOCK: "Visa mock",
+  OTHER: "Other",
+};
+
 /** How the student framed the request. Derived, not stored. */
 export type RequestLinkKind = "document" | "application" | "general";
 
@@ -19,6 +53,8 @@ export interface StudentRequestViewModel {
   description: string;
   status: RequestStatus;
   isUrgent: boolean;
+  urgency: RequestUrgency;
+  category: RequestCategory;
   urgentReason: string;
   adminResponse: string;
   createdAt: string;
@@ -36,6 +72,7 @@ export interface AdminRequestViewModel extends StudentRequestViewModel {
   documentTitle?: string;
   documentType?: string;
   documentContent?: string;
+  documentVersion?: number;
   /** linked application (if any) */
   applicationId?: string;
   universityName?: string;
@@ -49,6 +86,7 @@ interface ApiDocumentLink {
   title: string;
   type: string;
   content?: string;
+  version?: number;
 }
 
 interface ApiApplicationLink {
@@ -82,6 +120,8 @@ export interface ApiStudentRequestRow {
   description: string;
   status: RequestStatus;
   is_urgent: boolean;
+  urgency?: RequestUrgency | null;
+  category?: RequestCategory | null;
   urgent_reason: string | null;
   admin_response: string | null;
   created_at: string;
@@ -98,6 +138,8 @@ export function mapApiStudentRequestToViewModel(r: ApiStudentRequestRow): Studen
     description: r.description,
     status: r.status,
     isUrgent: r.is_urgent,
+    urgency: r.urgency || (r.is_urgent ? "HIGH" : "NORMAL"),
+    category: r.category || (r.documents ? "DOCUMENT_EDIT" : "CHAT"),
     urgentReason: r.urgent_reason || "",
     adminResponse: r.admin_response || "",
     createdAt: r.created_at,
@@ -129,6 +171,7 @@ export function mapApiAdminRequestToViewModel(r: ApiAdminRequestRow): AdminReque
     documentTitle: r.documents?.title,
     documentType: r.documents?.type,
     documentContent: r.documents?.content,
+    documentVersion: r.documents?.version,
     applicationId: r.applications?.id,
     universityName: r.applications?.university_name,
     programName: r.applications?.program_name ?? undefined,

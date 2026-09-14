@@ -22,6 +22,37 @@ export async function PUT(
 
     const updates = await request.json();
 
+    // Snapshot the superseded version when the content actually changes, so the
+    // version history reflects both student and admin edits.
+    if (typeof updates.content === 'string') {
+      const { data: current } = await supabase
+        .from('documents')
+        .select('content, version')
+        .eq('id', resolvedParams.id)
+        .eq('student_id', user.id)
+        .single();
+
+      if (current && (current.content ?? '') !== updates.content) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', user.id)
+          .single();
+
+        await supabase.from('document_versions').insert({
+          document_id: resolvedParams.id,
+          version: current.version ?? 1,
+          content: current.content ?? '',
+          version_note: updates.version_note || null,
+          edited_by: user.id,
+          editor_name: prof?.full_name ?? 'Student',
+          editor_role: 'STUDENT',
+        });
+        updates.version = (current.version ?? 1) + 1;
+      }
+    }
+    delete updates.version_note;
+
     // Update the document
     const { data: document, error: updateError } = await supabase
       .from('documents')

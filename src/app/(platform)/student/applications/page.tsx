@@ -152,6 +152,14 @@ export default function StudentApplicationsPage() {
       <PageHeader
         title="Application tracker"
         description="Track your university applications, deadlines, and application status"
+        actions={
+          <a
+            href="/student/university-research"
+            className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+          >
+            Browse university research →
+          </a>
+        }
       />
       {error && (
         <div className="-mt-2 mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">

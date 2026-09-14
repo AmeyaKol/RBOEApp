@@ -54,6 +54,32 @@ export default function StudentDocumentsPage() {
   const [initialized, setInitialized] = useState(false);
   const [requestingReview, setRequestingReview] = useState(false);
   const [reviewRequested, setReviewRequested] = useState(false);
+  const [historyDoc, setHistoryDoc] = useState<DocumentViewModel | null>(null);
+  const [versions, setVersions] = useState<
+    Array<{
+      id: string;
+      version: number;
+      content: string | null;
+      version_note: string | null;
+      editor_name: string | null;
+      editor_role: string | null;
+      created_at: string;
+    }>
+  >([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+
+  const openHistory = async (doc: DocumentViewModel) => {
+    setHistoryDoc(doc);
+    setVersionsLoading(true);
+    try {
+      const res = await fetch(`/api/documents/${doc.id}/versions`);
+      setVersions(res.ok ? await res.json() : []);
+    } catch {
+      setVersions([]);
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
 
   const getErrorMessage = (err: unknown, fallback: string) =>
     err instanceof Error ? err.message : fallback;
@@ -338,7 +364,12 @@ export default function StudentDocumentsPage() {
                       </CardDescription>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => currentDocument && openHistory(currentDocument)}
+                        disabled={!currentDocument}
+                      >
                         <History className="h-4 w-4 mr-2" />
                         Version History
                       </Button>
@@ -440,7 +471,12 @@ export default function StudentDocumentsPage() {
                       </CardDescription>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => currentDocument && openHistory(currentDocument)}
+                        disabled={!currentDocument}
+                      >
                         <History className="h-4 w-4 mr-2" />
                         Version History
                       </Button>
@@ -589,6 +625,67 @@ export default function StudentDocumentsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Version History Modal */}
+      {historyDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col">
+            <CardHeader className="flex-shrink-0">
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle>Version history — {historyDoc.title}</CardTitle>
+                  <CardDescription>
+                    Currently v{historyDoc.version}. Earlier versions are read-only.
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setHistoryDoc(null)}>
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto">
+              {versionsLoading ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                </div>
+              ) : versions.length === 0 ? (
+                <p className="py-6 text-sm text-muted-foreground">
+                  No earlier versions yet. Saving an edit records one.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {versions.map((v) => (
+                    <li key={v.id} className="rounded-lg border p-3">
+                      <div className="mb-1 flex flex-wrap items-center gap-2 text-sm">
+                        <span className="font-medium">v{v.version}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            v.editor_role === "ADMIN"
+                              ? "bg-indigo-100 text-indigo-800"
+                              : "bg-slate-100 text-slate-700"
+                          }
+                        >
+                          {v.editor_name || v.editor_role || "Unknown"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(v.created_at).toLocaleString()}
+                        </span>
+                        {v.version_note && (
+                          <span className="text-xs text-muted-foreground">— {v.version_note}</span>
+                        )}
+                      </div>
+                      <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">
+                        {v.content || "(empty)"}
+                      </pre>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Create University Copy Modal */}
       {showCreateModal && (
