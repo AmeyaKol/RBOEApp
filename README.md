@@ -1,6 +1,6 @@
 # RBOE
 
-**RBOE (Rohan's Best Outcomes for Education)** is a full-stack graduate admissions counseling platform. A small team of admin counselors manages a portfolio of students through the entire MS application journey — onboarding, document drafting, university research, requests, visa prep — while each student gets a focused workspace for their own applications and documents.
+**RBOE (Rajiv Bose Overseas Education)** is a full-stack graduate admissions counseling platform. A small team of admin counselors manages a portfolio of students through the entire MS application journey — onboarding, document drafting, university research, requests, visa prep — while each student gets a focused workspace for their own applications and documents.
 
 ![RBOE landing page](public/screenshots/landing.png)
 
@@ -105,19 +105,6 @@ Students land on their own dashboard — quick actions, application status, prof
 ![Scheduled visa mock interview](public/screenshots/student-visa.png)
 
 ![University research, student view](public/screenshots/student-university-research.png)
-
-## Business & AI (Preview)
-
-Four additional admin areas are UI previews only — clearly banner-labeled, backed by deterministic or illustrative data, and they persist nothing:
-
-- **Payroll** — staff roster, a simulated monthly run, and a payslip preview.
-- **Partnerships** — referral coupon generation, a sponsor list, and campaign funnels.
-- **Analytics** — admissions funnel, acceptance rate by university, request load, and revenue, all illustrative.
-- **AI Lab** — a college-prediction engine that buckets universities into Safe / Moderate / Ambitious from a student's GRE/GPA/TOEFL profile, and a simulated SOP/LOR review assistant. No external model is called.
-
-![AI Lab college prediction](public/screenshots/admin-preview-ai-lab.png)
-
-![Analytics preview](public/screenshots/admin-preview-analytics.png)
 
 ## Getting started
 
